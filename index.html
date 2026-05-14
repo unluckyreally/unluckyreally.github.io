@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ToT Query Difficulty Classifier</title>
+<style>
+:root {
+  --bg: #0e0e0c;
+  --surface: #161614;
+  --surface2: #1e1e1b;
+  --surface3: #252522;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text: #e8e7e0;
+  --text2: #888880;
+  --text3: #4a4a44;
+  --easy: #639922;
+  --easy-bg: #1a2e08;
+  --easy-text: #c0dd97;
+  --hard: #d85a30;
+  --hard-bg: #2e1008;
+  --hard-text: #f0997b;
+  --accent: #afa9ec;
+  --accent-bg: #1e1c3a;
+  --warn-bg: #1e1a08;
+  --warn-border: #635010;
+  --warn-text: #c8a84a;
+  --radius: 10px;
+  --mono: 'SF Mono','Fira Code','Consolas',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;line-height:1.6}
+
+/* HEADER */
+header{padding:3.5rem 1.5rem 2.5rem;text-align:center;border-bottom:0.5px solid var(--border)}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);background:var(--accent-bg);border-radius:100px;padding:4px 12px;margin-bottom:1.2rem;font-weight:500}
+.chip-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:.7}
+h1{font-size:2.4rem;font-weight:700;letter-spacing:-.03em;color:var(--text);margin-bottom:.6rem;line-height:1.15}
+h1 span{color:var(--accent)}
+header p{font-size:.92rem;color:var(--text2);max-width:500px;margin:0 auto}
+
+/* LAYOUT */
+.container{max-width:800px;margin:0 auto;padding:2rem 1.5rem 4rem}
+
+/* SECTION LABEL */
+.section-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:.6rem;display:block}
+
+/* EXAMPLES */
+.examples-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:1.5rem}
+.ex-btn{background:var(--surface);border:0.5px solid var(--border);border-radius:8px;padding:.7rem 1rem;text-align:left;cursor:pointer;font-size:13px;color:var(--text2);line-height:1.5;font-family:inherit;font-weight:400;display:flex;align-items:flex-start;gap:10px;transition:background .15s,color .15s;width:100%}
+.ex-btn:hover{background:var(--surface2);color:var(--text)}
+.ex-badge{font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px;font-family:var(--mono)}
+.ex-badge.easy{background:var(--easy-bg);color:var(--easy-text)}
+.ex-badge.hard{background:var(--hard-bg);color:var(--hard-text)}
+
+/* INPUT */
+.input-card{background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.5rem}
+.input-card label{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);font-weight:500;margin-bottom:.75rem}
+textarea{width:100%;background:var(--surface2);border:0.5px solid var(--border2);border-radius:8px;color:var(--text);font-family:inherit;font-size:15px;line-height:1.65;padding:.9rem 1rem;resize:vertical;min-height:110px;outline:none;transition:border-color .15s}
+textarea:focus{border-color:var(--accent)}
+textarea::placeholder{color:var(--text3)}
+.btn-row{display:flex;gap:10px;margin-top:1rem;flex-wrap:wrap;align-items:center}
+button{font-family:inherit;font-size:13px;font-weight:500;border-radius:7px;padding:.55rem 1.1rem;cursor:pointer;transition:opacity .15s,transform .1s;border:0.5px solid var(--border2)}
+button:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#0e0e0c;border-color:transparent;padding:.55rem 1.6rem}
+.btn-primary:hover{opacity:.88}
+.btn-ghost{background:transparent;color:var(--text2)}
+.btn-ghost:hover{background:var(--surface2);color:var(--text)}
+
+/* RESULT */
+#result{display:none}
+
+.verdict-card{border-radius:var(--radius);padding:1.5rem;margin-bottom:1.25rem;border:0.5px solid;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.verdict-card.easy{background:var(--easy-bg);border-color:var(--easy)}
+.verdict-card.hard{background:var(--hard-bg);border-color:var(--hard)}
+.verdict-label{font-size:1.6rem;font-weight:700;letter-spacing:-.02em;margin-bottom:.25rem}
+.verdict-card.easy .verdict-label{color:var(--easy-text)}
+.verdict-card.hard .verdict-label{color:var(--hard-text)}
+.verdict-sub{font-size:13px;color:var(--text2);max-width:340px}
+.prob-display{text-align:right;flex-shrink:0}
+.prob-num{font-size:2.2rem;font-weight:700;font-family:var(--mono);letter-spacing:-.04em;line-height:1}
+.verdict-card.easy .prob-num{color:var(--easy)}
+.verdict-card.hard .prob-num{color:var(--hard)}
+.prob-lbl{font-size:10px;color:var(--text2);letter-spacing:.07em;text-transform:uppercase;margin-top:4px}
+.threshold-note{font-size:11px;color:var(--text3);margin-top:3px;font-family:var(--mono)}
+
+/* BAR */
+.bar-wrap{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem 1.5rem;margin-bottom:1.25rem}
+.bar-head{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);margin-bottom:.6rem}
+.bar-track{height:8px;background:var(--surface3);border-radius:100px;overflow:hidden;position:relative}
+.bar-fill-easy{position:absolute;left:0;top:0;bottom:0;background:var(--easy);border-radius:100px;transition:width .4s cubic-bezier(.4,0,.2,1)}
+.bar-fill-hard{position:absolute;right:0;top:0;bottom:0;background:var(--hard);border-radius:100px;transition:width .4s cubic-bezier(.4,0,.2,1)}
+.bar-pcts{display:flex;justify-content:space-between;font-size:12px;font-family:var(--mono);margin-top:.45rem}
+.bar-pcts span:first-child{color:var(--easy)}
+.bar-pcts span:last-child{color:var(--hard)}
+.threshold-marker-wrap{position:relative;height:14px;margin-top:2px}
+.threshold-tick{position:absolute;top:0;width:1px;height:8px;background:var(--text3)}
+.threshold-tick-label{position:absolute;top:0;font-size:10px;color:var(--text3);font-family:var(--mono);white-space:nowrap;transform:translateX(-50%)}
+
+/* FEATURE BREAKDOWN */
+.breakdown{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1.25rem}
+.breakdown-hdr{padding:1rem 1.5rem .75rem;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.breakdown-hdr-left{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);font-weight:500}
+.breakdown-legend{display:flex;gap:12px;font-size:11px;color:var(--text3)}
+.leg-item{display:flex;align-items:center;gap:5px}
+.leg-dot{width:7px;height:7px;border-radius:50%}
+.leg-dot.hard{background:var(--hard)}
+.leg-dot.easy{background:var(--easy)}
+.feat-row{display:flex;align-items:center;gap:10px;padding:.5rem 1.5rem;border-bottom:0.5px solid var(--border)}
+.feat-row:last-child{border-bottom:none}
+.fn{color:var(--text2);width:195px;flex-shrink:0;font-family:var(--mono);font-size:11.5px}
+.fv{width:36px;flex-shrink:0;text-align:right;font-family:var(--mono);font-size:11.5px;color:var(--text)}
+.fb{flex:1;height:4px;background:var(--surface3);border-radius:100px;overflow:hidden}
+.fbf{height:100%;border-radius:100px;transition:width .35s ease}
+.fbf.pos{background:var(--hard)}
+.fbf.neg{background:var(--easy)}
+.fc{width:58px;flex-shrink:0;text-align:right;font-family:var(--mono);font-size:11px}
+.fc.pos{color:var(--hard-text)}
+.fc.neg{color:var(--easy-text)}
+.fc.zero{color:var(--text3)}
+
+/* REWRITE */
+.rewrite-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem 1.5rem;margin-bottom:1.25rem}
+.rewrite-text{font-family:var(--mono);font-size:13px;color:var(--accent);background:var(--accent-bg);padding:.6rem .9rem;border-radius:6px;margin-top:.5rem;word-break:break-word}
+
+/* LIMITATIONS */
+.limitations{background:var(--warn-bg);border:0.5px solid var(--warn-border);border-radius:var(--radius);padding:1.25rem 1.5rem;margin-bottom:1.5rem}
+.limitations-hdr{display:flex;align-items:center;gap:8px;margin-bottom:.85rem}
+.limitations-hdr span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--warn-text);font-weight:500}
+.lim-list{display:flex;flex-direction:column;gap:.5rem}
+.lim-item{display:flex;gap:10px;font-size:13px;color:#a89050;line-height:1.5}
+.lim-bullet{flex-shrink:0;color:var(--warn-border);font-weight:700;margin-top:1px}
+.lim-item strong{color:var(--warn-text);font-weight:500}
+
+/* FOOTER */
+.footer-note{font-size:12px;color:var(--text3);text-align:center;margin-top:3rem;line-height:1.8}
+.footer-note code{font-family:var(--mono);font-size:11px;background:var(--surface2);padding:1px 5px;border-radius:4px;color:var(--text2)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="chip"><span class="chip-dot"></span>Tip-of-the-Tongue Search</div>
+  <h1>Query Difficulty<br><span>Classifier</span></h1>
+  <p>Classifies a search query as <strong>easy</strong> or <strong>hard</strong> — purely from linguistic features, no API, no server. Runs entirely in your browser.</p>
+</header>
+
+<div class="container">
+
+  <!-- EXAMPLES -->
+  <span class="section-label">Try an example</span>
+  <div class="examples-grid">
+    <button class="ex-btn" onclick="setExample(0)">
+      <span class="ex-badge easy">Easy</span>
+      Hitchcock film shower murder scene Psycho Janet Leigh
+    </button>
+    <button class="ex-btn" onclick="setExample(1)">
+      <span class="ex-badge easy">Easy</span>
+      Queen rock band Bohemian Rhapsody Freddie Mercury
+    </button>
+    <button class="ex-btn" onclick="setExample(2)">
+      <span class="ex-badge hard">Hard</span>
+      there was this movie i saw maybe in the 90s or could have been 2000s, not sure. i think there was a woman who could see ghosts or maybe it was just one ghost. possibly french? or maybe american. the ending was really sad i think.
+    </button>
+    <button class="ex-btn" onclick="setExample(3)">
+      <span class="ex-badge hard">Hard</span>
+      that song from like the 80s possibly, kind of upbeat, something about running or maybe dancing, sort of like a-ha meets something else. not sure about the decade honestly.
+    </button>
+  </div>
+
+  <!-- INPUT -->
+  <div class="input-card">
+    <label for="qi">Your query</label>
+    <textarea id="qi" placeholder="Describe what you're trying to find…"></textarea>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="classify()">Classify</button>
+      <button class="btn-ghost" onclick="clearAll()">Clear</button>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="result">
+
+    <div id="vCard" class="verdict-card easy">
+      <div>
+        <div class="verdict-label" id="vLabel">—</div>
+        <div class="verdict-sub" id="vSub">—</div>
+      </div>
+      <div class="prob-display">
+        <div class="prob-num" id="vProb">—</div>
+        <div class="prob-lbl">hard probability</div>
+        <div class="threshold-note" id="vThresh">—</div>
+      </div>
+    </div>
+
+    <div class="bar-wrap">
+      <div class="bar-head"><span>Easy</span><span>Hard</span></div>
+      <div class="bar-track">
+        <div class="bar-fill-easy" id="barEasy" style="width:0%"></div>
+        <div class="bar-fill-hard" id="barHard" style="width:0%"></div>
+      </div>
+      <div class="threshold-marker-wrap">
+        <div class="threshold-tick" id="threshTick" style="left:21%"></div>
+        <span class="threshold-tick-label" id="threshLabel" style="left:21%">threshold 0.21</span>
+      </div>
+      <div class="bar-pcts">
+        <span id="pEasy">0%</span>
+        <span id="pHard">0%</span>
+      </div>
+    </div>
+
+    <div class="breakdown">
+      <div class="breakdown-hdr">
+        <span class="breakdown-hdr-left">Feature contributions → hard score</span>
+        <div class="breakdown-legend">
+          <div class="leg-item"><div class="leg-dot hard"></div><span>pushes hard</span></div>
+          <div class="leg-item"><div class="leg-dot easy"></div><span>pushes easy</span></div>
+        </div>
+      </div>
+      <div id="featRows"></div>
+    </div>
+
+    <div id="rwCard" class="rewrite-card" style="display:none">
+      <span class="section-label">Heuristic rewrite (filler stripped)</span>
+      <div class="rewrite-text" id="rwText"></div>
+    </div>
+
+  </div><!-- /result -->
+
+  <!-- LIMITATIONS -->
+  <div class="limitations">
+    <div class="limitations-hdr">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="flex-shrink:0"><circle cx="7" cy="7" r="6.5" stroke="#635010"/><path d="M7 4v3.5" stroke="#c8a84a" stroke-width="1.4" stroke-linecap="round"/><circle cx="7" cy="10" r=".75" fill="#c8a84a"/></svg>
+      <span>Known limitations</span>
+    </div>
+    <div class="lim-list">
+      <div class="lim-item"><span class="lim-bullet">·</span><div><strong>No NER.</strong> The features <code>has_person</code> and <code>has_work_of_art</code> are always 0 here — they need spaCy's named-entity recogniser which cannot run in a browser. The model was trained with spaCy, so those two dimensions may underweight some queries.</div></div>
+      <div class="lim-item"><span class="lim-bullet">·</span><div><strong>Training data size.</strong> The model was trained on the same test split used for evaluation. With a small dataset this risks overfitting, and the decision boundary may not generalise well to query styles outside the training set.</div></div>
+      <div class="lim-item"><span class="lim-bullet">·</span><div><strong>Surface features only.</strong> Classification relies on hand-crafted lexicons (hedge words, genre words, negation, etc.). A query can be genuinely hard to retrieve without containing any of these signals, and vice versa.</div></div>
+      <div class="lim-item"><span class="lim-bullet">·</span><div><strong>Low threshold (0.21).</strong> The threshold is tuned for high recall of hard queries (F₂ optimisation), so the classifier leans toward labelling ambiguous queries as hard. This reduces missed hard cases but increases false positives.</div></div>
+      <div class="lim-item"><span class="lim-bullet">·</span><div><strong>Domain specificity.</strong> The model is trained on Tip-of-the-Tongue queries (movies, books, songs, words). It will likely misclassify queries from other domains.</div></div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    Implements <code>extracteFeatures()</code> from <code>tot_router.py</code> in JavaScript · weights baked from <code>model.pkl</code><br>
+    StandardScaler + LogisticRegression · threshold = 0.21 (F₂-optimised for hard-query recall)
+  </div>
+
+</div>
+
+<script>
+// ── REAL MODEL WEIGHTS (extracted from model.pkl) ─────────────
+const MODEL = {
+  patched: true,
+  threshold: 0.210000,
+  scaler_mean:  [138.937143,10.011429,2.320000,0.548571,0.125714,0.017143,4.468571,0.035575,0.280000,0.062857,0.645714,0.451429,0.337143,4.271476,0.320000,0.080000,0.000000],
+  scaler_scale: [78.718751,5.022223,1.857925,0.738095,0.331527,0.129804,3.285968,0.023936,0.448999,0.242706,0.821268,0.562328,0.472734,0.337100,0.756231,0.271293,1.000000],
+  coef:         [-1.114070,0.397159,0.417606,-0.359757,0.241590,0.369233,1.215122,-0.682820,-0.378631,-0.089692,0.140432,0.130490,0.596205,-0.827462,0.072642,-0.268004,0.000000],
+  intercept:    0.469312
+};
+// ─────────────────────────────────────────────────────────────
+
+const FEAT_NAMES = [
+  "token_count","sentence_count","hedge_count","negation_count",
+  "false_memory_flag","decade_uncertainty","ent_count","ent_density",
+  "has_person","has_work_of_art","genre_word_count","comparison_count",
+  "question_mark_flag","avg_token_length","caps_word_count",
+  "uncertainty_phrase_count","previous_attempt_flag"
+];
+
+// Lexicons — ported 1:1 from tot_router.py
+const FILLER_WORDS = new Set(["maybe","possibly","perhaps","might","think","believe","probably","around","roughly","approximately","somewhat","the","a","an","is","it","was","were","this","that","there","very","really","just","so","but","and","or","if","i","my","me","not","no"]);
+const HEDGE_WORDS  = ["maybe","possibly","perhaps","might","think","believe","probably","around","roughly","approximately","somewhat","sort of","kind of","i think","not sure","i believe","could be","might be","seems like"];
+const NEGATIONS    = ["not","never","didn't","don't","wasn't","weren't","isn't","aren't","no","none","neither","nor","without","can't","cannot"];
+const UNCERT_PH    = ["i'm not sure","not certain","could be wrong","don't remember","can't remember","hard to say","fuzzy on","vague memory","i think i saw","if i recall","as far as i remember"];
+const FALSE_MEM    = ["i think it was","might have been","could have been a","i remember it being","maybe it was a","or maybe"];
+const UNDECADE     = ["maybe the","could be from the","don't know the year","sometime in the","probably from the","early or mid"];
+const GENRES       = new Set(["horror","comedy","sci-fi","science fiction","thriller","documentary","action","romance","drama","fantasy","animation","animated","mystery","crime","biography","historical","foreign","indie","musical","adventure","western","noir","surreal","experimental"]);
+const CMP_WORDS    = ["like","similar to","reminds me of","reminded me of","sort of like","kind of like","meets","mixed with","in the style of","vibes of"];
+const FAILED       = ["already tried","searched everywhere","can't find it","google doesn't help","couldn't find","spent hours"];
+const FILLER_RE    = [
+  /i('m| am) looking for (a |an |the )?/gi,
+  /i('m| am) trying to find (a |an |the )?/gi,
+  /i can'?t remember (the )?(name|title)[,. ]*?(but\s*)?/gi,
+  /i('ve| have) been searching (everywhere\s*)?/gi,
+  /(not sure|i'?m not (certain|sure)) (if |about |whether )?/gi,
+  /it (might|could|may) (have )?been (a |an |the )?/gi,
+  /(already tried|searched everywhere|can'?t find it)[,. ]*/gi,
+  /(i remember|i recall|i think i (saw|read|watched))\s+/gi,
+  /i'?ve tried [a-z]+ and couldn'?t find it[. ]*/gi,
+  /(the cover was|i believe|i think)\s+/gi,
+  /there was (this|a) (movie|book|song|documentary|show|film|word|term)\s*/gi,
+  /(vaguely|sort of|kind of) (remember|recall)\s+/gi,
+  /does anyone (know|remember|recall|have any idea)[^.?!]*[.?!]?\s*/gi,
+  /any (idea|clue|help|suggestions?)[^.?!]*[.?!]?\s*/gi,
+  /i('d| would) (really )?(love|like|appreciate) (to|if)[^.?!]*[.?!]?\s*/gi,
+  /(please |help me )(find|identify|remember)[^.?!]*/gi,
+  /i'?m not sure if this is even (a |an )?(movie|book|song|show|film|word)[,. ]*/gi,
+  /if you have any (ideas?|suggestions?)[^.?!]*[.?!]?\s*/gi,
+  /thank(s| you) (in advance|so much|a lot)[^.?!]*[.?!]?\s*/gi,
+];
+
+// ── Feature extraction — exact port of extracteFeatures() ────
+function extractFeatures(text) {
+  const raw   = text.trim().split(/\s+/).filter(Boolean);
+  const lower = raw.map(t => t.toLowerCase());
+  const t     = text.toLowerCase();
+
+  const f1  = raw.length;
+  const f2  = (text.match(/[.!?]/g)||[]).length + 1;
+  const f3  = HEDGE_WORDS.reduce((n,h)  => n + (t.includes(h) ? 1 : 0), 0);
+  const f4  = NEGATIONS.reduce((n,w) => {
+    const re = new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b');
+    return n + (re.test(t) ? 1 : 0);
+  }, 0);
+  const f5  = FALSE_MEM.some(f => t.includes(f)) ? 1 : 0;
+  const f6  = UNDECADE.some(u  => t.includes(u)) ? 1 : 0;
+
+  // entity heuristic (no spaCy → proper noun count)
+  const proper = raw.filter(tk =>
+    tk.length > 1 &&
+    /^[A-Z]/.test(tk) &&
+    tk !== tk.toUpperCase() &&
+    !["I","I'm","I've","I'd"].includes(tk)
+  );
+  const f7  = proper.length;
+  const f8  = raw.length ? f7 / raw.length : 0;
+  const f9  = 0; // has_person      — needs spaCy NER
+  const f10 = 0; // has_work_of_art — needs spaCy NER
+
+  const f11 = [...GENRES].reduce((n,g)   => n + (t.includes(g) ? 1 : 0), 0);
+  const f12 = CMP_WORDS.reduce((n,c)     => n + (t.includes(c) ? 1 : 0), 0);
+  const f13 = text.includes('?') ? 1 : 0;
+  const f14 = lower.length ? lower.reduce((s,tk) => s + tk.length, 0) / lower.length : 0;
+  const f15 = raw.filter(tk => tk.length >= 3 && tk === tk.toUpperCase() && /[A-Z]/.test(tk)).length;
+  const f16 = UNCERT_PH.reduce((n,ph) => n + (t.includes(ph) ? 1 : 0), 0);
+  const f17 = FAILED.some(p => t.includes(p)) ? 1 : 0;
+
+  return [f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17];
+}
+
+// ── Heuristic rewrite — port of heurRewrite() ────────────────
+function heurRewrite(text, max=10) {
+  return text.toLowerCase().split(/\s+/)
+    .filter(t => !FILLER_WORDS.has(t) && t.length > 2)
+    .slice(0, max).join(' ');
+}
+
+// ── Logistic regression inference ────────────────────────────
+function sigmoid(x){ return 1/(1+Math.exp(-x)); }
+
+function predict(features) {
+  const scaled   = features.map((v,i) => (v - MODEL.scaler_mean[i]) / (MODEL.scaler_scale[i] || 1));
+  const logit    = scaled.reduce((s,v,i) => s + v * MODEL.coef[i], MODEL.intercept);
+  const probHard = sigmoid(logit);
+  const contribs = scaled.map((v,i) => v * MODEL.coef[i]);
+  return { probHard, isHard: probHard >= MODEL.threshold, contribs, raw: features };
+}
+
+// ── Example queries ───────────────────────────────────────────
+const EXAMPLES = [
+  "Hitchcock film shower murder scene Psycho Janet Leigh",
+  "Queen rock band Bohemian Rhapsody Freddie Mercury",
+  "there was this movie i saw maybe in the 90s or could have been 2000s, not sure. i think there was a woman who could see ghosts or maybe it was just one ghost. possibly french? or maybe american. the ending was really sad i think.",
+  "that song from like the 80s possibly, kind of upbeat, something about running or maybe dancing, sort of like a-ha meets something else. not sure about the decade honestly.",
+];
+function setExample(i){ document.getElementById('qi').value = EXAMPLES[i]; classify(); }
+
+// ── Classify ──────────────────────────────────────────────────
+function classify() {
+  const text = document.getElementById('qi').value.trim();
+  if (!text) return;
+
+  const features = extractFeatures(text);
+  const { probHard, isHard, contribs } = predict(features);
+  const probEasy = 1 - probHard;
+
+  // verdict card
+  document.getElementById('vCard').className = 'verdict-card ' + (isHard ? 'hard' : 'easy');
+  document.getElementById('vLabel').textContent = isHard ? 'Hard query' : 'Easy query';
+  document.getElementById('vSub').textContent   = isHard
+    ? 'Likely needs LLM rewrite + RRF fusion for good retrieval'
+    : 'Standard BM25 retrieval should suffice';
+  document.getElementById('vProb').textContent  = (probHard * 100).toFixed(1) + '%';
+  document.getElementById('vThresh').textContent = 'threshold = ' + MODEL.threshold.toFixed(2);
+
+  // probability bar + threshold marker
+  document.getElementById('barEasy').style.width = (probEasy * 100).toFixed(1) + '%';
+  document.getElementById('barHard').style.width = (probHard * 100).toFixed(1) + '%';
+  document.getElementById('pEasy').textContent   = (probEasy * 100).toFixed(1) + '%';
+  document.getElementById('pHard').textContent   = (probHard * 100).toFixed(1) + '%';
+  const threshPct = ((1 - MODEL.threshold) * 100).toFixed(1) + '%';
+  document.getElementById('threshTick').style.left  = threshPct;
+  document.getElementById('threshLabel').style.left = threshPct;
+  document.getElementById('threshLabel').textContent = 'threshold ' + MODEL.threshold.toFixed(2);
+
+  // feature breakdown
+  const maxC = Math.max(...contribs.map(Math.abs), 0.01);
+  document.getElementById('featRows').innerHTML = FEAT_NAMES.map((name, i) => {
+    const rv   = features[i];
+    const c    = contribs[i];
+    const pct  = (Math.min(100, Math.abs(c) / maxC * 100)).toFixed(1);
+    const dir  = c > 0.005 ? 'pos' : c < -0.005 ? 'neg' : 'zero';
+    const cs   = c === 0 ? '±0' : (c > 0 ? '+' : '') + c.toFixed(3);
+    const disp = Number.isInteger(rv) ? rv : rv.toFixed(3);
+    const dimmed = (name === 'has_person' || name === 'has_work_of_art') ? ' style="opacity:.4"' : '';
+    return `<div class="feat-row"${dimmed}>
+      <span class="fn">${name}</span>
+      <span class="fv">${disp}</span>
+      <div class="fb"><div class="fbf ${dir}" style="width:${pct}%"></div></div>
+      <span class="fc ${dir}">${cs}</span>
+    </div>`;
+  }).join('');
+
+  // heuristic rewrite
+  const rw = heurRewrite(text);
+  const rwCard = document.getElementById('rwCard');
+  if (rw && rw.length > 0) {
+    document.getElementById('rwText').textContent = rw;
+    rwCard.style.display = '';
+  } else {
+    rwCard.style.display = 'none';
+  }
+
+  const res = document.getElementById('result');
+  res.style.display = 'block';
+  res.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function clearAll() {
+  document.getElementById('qi').value = '';
+  document.getElementById('result').style.display = 'none';
+}
+</script>
+</body>
+</html>
